@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Environment variables (NEVER commit secrets!)
+.env
+.env.local
+.env.*.local
+
+# Database (contains wallet keys and merkletree data)
+db/
+db-*/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+transfer-test-*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+.cache/
+
+# Artifacts cache
+artifacts-cache/
+
+# Test outputs
+coverage/
+.nyc_output/
+
+# ZK-SNARK artifacts (42MB, available from npm package)
+artifacts-v2.1/
+artifacts-v*/

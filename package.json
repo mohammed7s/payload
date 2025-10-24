@@ -1,0 +1,30 @@
+{
+  "name": "railgun-payroll-test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "patch-package"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@railgun-community/shared-models": "7.5.0",
+    "@railgun-community/wallet": "10.5.1",
+    "@railgun-community/engine": "9.4.0",
+    "dotenv": "^17.2.3",
+    "ethers": "6.13.1",
+    "leveldown": "^6.1.1",
+    "snarkjs": "^0.6.10"
+  },
+  "devDependencies": {
+    "@types/leveldown": "^4.0.6",
+    "@types/node": "^24.9.1",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
