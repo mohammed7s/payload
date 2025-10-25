@@ -17,6 +17,7 @@ import {
   generateTransferProof,
   getProver,
   SnarkJSGroth16,
+  createRailgunWallet,
 } from '@railgun-community/wallet';
 import { groth16 } from 'snarkjs';
 import {
@@ -27,6 +28,7 @@ import {
   EVMGasType,
   TransactionGasDetails,
   TXIDVersion,
+  getEVMGasTypeForTransaction,
 } from '@railgun-community/shared-models';
 import leveldown from 'leveldown';
 import fs from 'fs';
@@ -37,6 +39,15 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const TOKEN_ADDRESS = process.env.TEST_TOKEN_ADDRESS!;
 const EMPLOYER_MNEMONIC = process.env.RAILGUN_WALLET_MNEMONIC!;
 
+const fileExists = (path: string): Promise<boolean> => {
+  return new Promise(resolve => {
+    fs.promises
+      .access(path)
+      .then(() => resolve(true))
+      .catch(() => resolve(false));
+  });
+};
+
 async function main() {
   console.log('\n' + '='.repeat(70));
   console.log('🔍 TRANSACTION DATA DIAGNOSTIC');
@@ -46,25 +57,27 @@ async function main() {
   // Initialize
   console.log('🚀 Initializing RAILGUN Engine...\n');
 
-  const db = leveldown('db');
+  // Setup logging
   setLoggers(
-    (msg: string) => console.log(`[RAILGUN] ${msg}`),
-    (msg: string) => console.log(`[RAILGUN ERROR] ${msg}`)
+    (msg) => console.log(`[RAILGUN] ${msg}`),
+    (error) => console.error(`[RAILGUN ERROR]`, error)
   );
 
-  const artifactGetter = async (path: string) => {
-    const artifactPath = `./node_modules/@railgun-community/wallet/dist/artifacts/${path}`;
-    return fs.promises.readFile(artifactPath, 'utf8');
-  };
+  // LevelDB for storing encrypted wallet data
+  const db = leveldown('./db');
 
+  // Artifact store (like cookbook)
   const artifactStore = new ArtifactStore(
-    artifactGetter,
-    async () => {},
-    async () => undefined
+    fs.promises.readFile,
+    async (dir, path, data) => {
+      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.writeFile(path, data);
+    },
+    fileExists,
   );
 
   await startRailgunEngine(
-    'tx-diagnostic',
+    'tx diagnostic',
     db,
     true,
     artifactStore,
@@ -74,36 +87,56 @@ async function main() {
     [],
   );
 
-  const prover = getProver();
-  prover.setSnarkJSGroth16(groth16 as SnarkJSGroth16);
-
   console.log('✅ RAILGUN Engine initialized\n');
 
+  // Setup snarkjs prover for zero-knowledge proofs
+  console.log('🔧 Setting up snarkjs prover...');
+  const prover = getProver();
+  prover.setSnarkJSGroth16(groth16 as SnarkJSGroth16);
+  console.log('✅ Prover configured\n');
+
   // Setup provider
-  const fallbackConfig: FallbackProviderJsonConfig = {
-    chainId: NETWORK_CONFIG[NETWORK_NAME].chain.id,
-    providers: [{ provider: RPC_URL, priority: 1, weight: 1 }],
+  console.log('🌐 Setting up network provider...\n');
+
+  const chainId = NETWORK_CONFIG[NETWORK_NAME].chain.id;
+
+  const fallbackProviderConfig: FallbackProviderJsonConfig = {
+    chainId,
+    providers: [
+      {
+        provider: RPC_URL,
+        priority: 1,
+        weight: 2, // Must be >= 2 for fallback quorum
+      },
+    ],
   };
-  await loadProvider(fallbackConfig, NETWORK_NAME);
+
+  const pollingInterval = 10000;
+  await loadProvider(fallbackProviderConfig, NETWORK_NAME, pollingInterval);
+
+  console.log('✅ Provider connected to', NETWORK_NAME, '\n');
 
   // Load wallets
-  const { createRailgunWallet } = await import('@railgun-community/wallet');
+  console.log('🔐 Loading wallets...\n');
+
+  // Encryption key must be 32 bytes (64 hex characters) for AES-256
+  const encryptionKey = '0101010101010101010101010101010101010101010101010101010101010101';
 
   const employerWallet = await createRailgunWallet(
-    'test-encryption-key',
+    encryptionKey,
     EMPLOYER_MNEMONIC,
-    undefined,
+    {}, // creationBlockNumbers
   );
 
   // Create employee wallet for testing
   const employeeWallet = await createRailgunWallet(
-    'test-encryption-key',
+    encryptionKey,
     'test test test test test test test test test test test junk', // Test mnemonic
-    undefined,
+    {},
   );
 
   console.log(`Employer wallet: ${employerWallet.id.substring(0, 20)}...`);
-  console.log(`Employee wallet: ${employeeWallet.address.substring(0, 45)}...\n`);
+  console.log(`Employee wallet: ${employeeWallet.railgunAddress.substring(0, 45)}...\n`);
 
   // Prepare public wallet
   const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -118,11 +151,9 @@ async function main() {
     {
       tokenAddress: TOKEN_ADDRESS,
       amount: BigInt('100000'), // 0.1 USDC
-      recipientAddress: employeeWallet.address,
+      recipientAddress: employeeWallet.railgunAddress,
     },
   ];
-
-  const encryptionKey = 'test-encryption-key';
 
   console.log('Generating proof for 0.1 USDC transfer...');
 
@@ -163,11 +194,14 @@ async function main() {
 
   // Get gas estimate
   const feeData = await provider.getFeeData();
+  const evmGasType = getEVMGasTypeForTransaction(NETWORK_NAME, false); // false = using RAILGUN wallet (not public)
+
   const gasDetails: TransactionGasDetails = {
-    evmGasType: EVMGasType.Type2,
+    evmGasType,
     gasEstimate: 250000n,
-    maxFeePerGas: feeData.maxFeePerGas ?? undefined,
-    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? undefined,
+    maxFeePerGas: evmGasType === EVMGasType.Type2 ? feeData.maxFeePerGas ?? undefined : undefined,
+    maxPriorityFeePerGas: evmGasType === EVMGasType.Type2 ? feeData.maxPriorityFeePerGas ?? undefined : undefined,
+    gasPrice: evmGasType === EVMGasType.Type1 ? feeData.gasPrice ?? undefined : undefined,
   };
 
   console.log('Populating transaction...');
@@ -209,6 +243,7 @@ async function main() {
   console.log('Field Details:');
   console.log(`  to: ${transferResult.transaction.to}`);
   console.log(`  data: ${transferResult.transaction.data ? 'PRESENT' : 'MISSING'}`);
+  console.log(`  data type: ${typeof transferResult.transaction.data}`);
   console.log(`  data length: ${transferResult.transaction.data?.length || 0} characters`);
   console.log(`  data (first 100 chars): ${transferResult.transaction.data?.substring(0, 100) || 'EMPTY'}`);
   console.log(`  gasLimit: ${transferResult.transaction.gasLimit?.toString()}`);
@@ -305,32 +340,63 @@ async function main() {
   }
 
   console.log('='.repeat(70));
-  console.log('🎯 STEP 6: Compare with Failed Transaction');
+  console.log('🎯 STEP 6: Test Actual Submission (DRY RUN)');
   console.log('='.repeat(70));
   console.log();
 
-  console.log('Previous failed transaction hash:');
-  console.log('0xa8c37f3bc22c0c50162bf952731d01f62dfc8255396240f54bb7166e8a1141fa');
-  console.log();
-  console.log('According to error log, that transaction had:');
-  console.log('  - transaction.data: "" (EMPTY)');
-  console.log('  - gasUsed: 235319 (reverted)');
-  console.log('  - status: 0 (failed)');
-  console.log();
-  console.log('Current transaction would have:');
-  console.log(`  - transaction.data: ${txFinal.data ? `${txFinal.data.length} chars` : 'EMPTY'}`);
-  console.log(`  - data is: ${txFinal.data ? 'POPULATED' : 'MISSING'}`);
+  console.log('Testing what happens during actual sendTransaction call...');
   console.log();
 
-  if (txFinal.data && txFinal.data.length > 100) {
-    console.log('✅ Current transaction data looks valid!');
-    console.log('   The issue may be:');
-    console.log('   1. Data being lost in wallet.sendTransaction() call');
-    console.log('   2. Data encoding issue when submitting to RPC');
-    console.log('   3. Bug in how we call sendTransaction');
-  } else {
-    console.log('❌ Current transaction ALSO has empty data!');
-    console.log('   The issue is in proof generation or population');
+  // Create the exact transaction object we send in test-shield.ts
+  const txToSend = {
+    to: transferResult.transaction.to,
+    data: transferResult.transaction.data,
+    value: 0n,
+    gasLimit: transferResult.transaction.gasLimit,
+    maxFeePerGas: transferResult.transaction.maxFeePerGas,
+    maxPriorityFeePerGas: transferResult.transaction.maxPriorityFeePerGas,
+    type: 2,
+    chainId: chainId,
+    nonce: nonce,
+  };
+
+  console.log('Transaction object to send:');
+  console.log(`  to: ${txToSend.to}`);
+  console.log(`  data: ${txToSend.data ? `${txToSend.data.length} chars` : 'MISSING'}`);
+  console.log(`  data (first 100): ${txToSend.data?.substring(0, 100)}`);
+  console.log(`  value: ${txToSend.value}`);
+  console.log(`  gasLimit: ${txToSend.gasLimit}`);
+  console.log(`  maxFeePerGas: ${txToSend.maxFeePerGas}`);
+  console.log(`  maxPriorityFeePerGas: ${txToSend.maxPriorityFeePerGas}`);
+  console.log(`  type: ${txToSend.type}`);
+  console.log(`  chainId: ${txToSend.chainId}`);
+  console.log(`  nonce: ${txToSend.nonce}`);
+  console.log();
+
+  // Test signing
+  console.log('Testing transaction signing...');
+  try {
+    const signedTx = await publicWallet.signTransaction(txToSend);
+    console.log('✅ Transaction signed successfully');
+    console.log(`   Signed tx length: ${signedTx.length} bytes`);
+    console.log(`   First 200 chars: ${signedTx.substring(0, 200)}`);
+    console.log();
+
+    // Parse signed transaction to verify data is still there
+    const parsedTx = ethers.Transaction.from(signedTx);
+    console.log('Parsed signed transaction:');
+    console.log(`  to: ${parsedTx.to}`);
+    console.log(`  data: ${parsedTx.data ? `${parsedTx.data.length} chars` : 'MISSING'}`);
+    console.log(`  data (first 100): ${parsedTx.data?.substring(0, 100)}`);
+    console.log();
+
+    if (!parsedTx.data || parsedTx.data === '0x') {
+      console.log('❌ CRITICAL: Data disappeared during signing!');
+    } else {
+      console.log('✅ Data preserved through signing process');
+    }
+  } catch (error) {
+    console.error('❌ Signing failed:', error);
   }
 
   console.log();

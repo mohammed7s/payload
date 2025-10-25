@@ -14,6 +14,7 @@ import {
   walletForID,
   getTXOsReceivedPOIStatusInfoForWallet,
   refreshReceivePOIsForWallet,
+  createRailgunWallet,
 } from '@railgun-community/wallet';
 import {
   NetworkName,
@@ -28,6 +29,15 @@ const NETWORK_NAME: NetworkName = NetworkName.EthereumSepolia;
 const RPC_URL = process.env.ETHEREUM_RPC_URL!;
 const EMPLOYER_MNEMONIC = process.env.RAILGUN_WALLET_MNEMONIC!;
 
+const fileExists = (path: string): Promise<boolean> => {
+  return new Promise(resolve => {
+    fs.promises
+      .access(path)
+      .then(() => resolve(true))
+      .catch(() => resolve(false));
+  });
+};
+
 async function main() {
   console.log('\n' + '='.repeat(70));
   console.log('🔍 RAILGUN POI VALIDATION DIAGNOSTIC');
@@ -37,25 +47,27 @@ async function main() {
   // Initialize RAILGUN Engine
   console.log('🚀 Initializing RAILGUN Engine...\n');
 
-  const db = leveldown('db');
+  // Setup logging
   setLoggers(
-    (msg: string) => console.log(`[RAILGUN] ${msg}`),
-    (msg: string) => console.log(`[RAILGUN ERROR] ${msg}`)
+    (msg) => console.log(`[RAILGUN] ${msg}`),
+    (error) => console.error(`[RAILGUN ERROR]`, error)
   );
 
-  const artifactGetter = async (path: string) => {
-    const artifactPath = `./node_modules/@railgun-community/wallet/dist/artifacts/${path}`;
-    return fs.promises.readFile(artifactPath, 'utf8');
-  };
+  // LevelDB for storing encrypted wallet data
+  const db = leveldown('./db');
 
+  // Artifact store (like cookbook)
   const artifactStore = new ArtifactStore(
-    artifactGetter,
-    async () => {},
-    async () => undefined
+    fs.promises.readFile,
+    async (dir, path, data) => {
+      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.writeFile(path, data);
+    },
+    fileExists,
   );
 
   await startRailgunEngine(
-    'poi-diagnostic',
+    'poi diagnostic',
     db,
     true,
     artifactStore,
@@ -68,19 +80,36 @@ async function main() {
   console.log('✅ RAILGUN Engine initialized\n');
 
   // Setup provider
-  const fallbackConfig: FallbackProviderJsonConfig = {
-    chainId: NETWORK_CONFIG[NETWORK_NAME].chain.id,
-    providers: [{ provider: RPC_URL, priority: 1, weight: 1 }],
+  console.log('🌐 Setting up network provider...\n');
+
+  const chainId = NETWORK_CONFIG[NETWORK_NAME].chain.id;
+
+  const fallbackProviderConfig: FallbackProviderJsonConfig = {
+    chainId,
+    providers: [
+      {
+        provider: RPC_URL,
+        priority: 1,
+        weight: 2, // Must be >= 2 for fallback quorum
+      },
+    ],
   };
-  await loadProvider(fallbackConfig, NETWORK_NAME);
+
+  const pollingInterval = 10000;
+  await loadProvider(fallbackProviderConfig, NETWORK_NAME, pollingInterval);
+
+  console.log('✅ Provider connected to', NETWORK_NAME, '\n');
 
   // Load wallet
   console.log('🔐 Loading employer wallet...\n');
-  const { createRailgunWallet } = await import('@railgun-community/wallet');
+
+  // Encryption key must be 32 bytes (64 hex characters) for AES-256
+  const encryptionKey = '0101010101010101010101010101010101010101010101010101010101010101';
+
   const employerWallet = await createRailgunWallet(
-    'test-encryption-key',
+    encryptionKey,
     EMPLOYER_MNEMONIC,
-    undefined,
+    {}, // creationBlockNumbers - empty object means start from current block
   );
 
   console.log(`✅ Wallet loaded: ${employerWallet.id.substring(0, 20)}...\n`);

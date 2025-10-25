@@ -6,6 +6,7 @@
  * 2. Creating a RAILGUN wallet (0zk address)
  * 3. Shielding ERC-20 tokens from a public Ethereum wallet
  * 4. Checking the private balance
+ * 5. Performing a private transfer between RAILGUN wallets
  *
  * Run with: bun run src/test-shield.ts
  */
@@ -390,6 +391,28 @@ async function shieldTokens(railgunAddress: string): Promise<void> {
     console.log('   ✅ Shield transaction confirmed in block:', receipt?.blockNumber);
     console.log('\n🎉 Tokens successfully shielded!\n');
 
+    // Wait a few seconds for the engine to process the new shield
+    console.log('⏳ Waiting for RAILGUN engine to process the new shield...');
+    await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+
+    // Check total balance (including non-spendable)
+    const walletObj = walletForID(employerWalletId);
+    const totalBalance = await balanceForERC20Token(
+      TXIDVersion.V2_PoseidonMerkle,
+      walletObj,
+      NETWORK_NAME,
+      TOKEN_ADDRESS,
+      false, // onlySpendable - FALSE to see all funds including pending POI
+    );
+
+    console.log('\n📊 New Shield Summary:');
+    console.log('='.repeat(60));
+    console.log(`   Token: ${TOKEN_ADDRESS}`);
+    console.log(`   Total shielded (including pending): ${(Number(totalBalance) / 1000000).toFixed(6)} USDC`);
+    console.log(`   Status: Pending POI validation`);
+    console.log('='.repeat(60));
+    console.log();
+
   } catch (error) {
     console.error('❌ Failed to shield tokens:', error);
     throw error;
@@ -506,7 +529,22 @@ async function privateTransfer(
       },
     ];
 
-    // Step 6a: Generate proof for the transfer
+    // Step 6a: Get gas price FIRST (needed for proof generation)
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
+    const feeData = await provider.getFeeData();
+    const evmGasType = getEVMGasTypeForTransaction(NETWORK_NAME, true);
+
+    // CRITICAL: When sendWithPublicWallet=true, the proof still needs to know the gas price
+    // because minGasPrice is part of boundParamsHash
+    const overallBatchMinGasPrice = evmGasType === EVMGasType.Type1
+      ? feeData.gasPrice
+      : feeData.maxFeePerGas;
+
+    console.log(`\n📊 Gas Price for Proof:`);
+    console.log(`   Gas Type: ${evmGasType === EVMGasType.Type1 ? 'Type1 (legacy)' : 'Type2 (EIP-1559)'}`);
+    console.log(`   overallBatchMinGasPrice: ${overallBatchMinGasPrice}\n`);
+
+    // Step 6b: Generate proof for the transfer
     console.log('🔐 Generating zero-knowledge proof...');
     console.log('   This proves you have the funds without revealing the amount\n');
 
@@ -520,8 +558,8 @@ async function privateTransfer(
       erc20AmountRecipients,
       [], // nftAmountRecipients
       undefined, // broadcasterFeeERC20AmountRecipient
-      true, // sendWithPublicWallet - TRUE for testing (signing with our own wallet)
-      undefined, // overallBatchMinGasPrice
+      true, // sendWithPublicWallet - TRUE = we (public EOA) will sign and send this tx
+      overallBatchMinGasPrice, // MUST match the actual gas price that will be used!
       (progress: number, status: string) => {
         console.log(`   Progress: ${(progress * 100).toFixed(1)}% - ${status}`);
       },
@@ -529,16 +567,17 @@ async function privateTransfer(
 
     console.log('   ✅ Proof generated\n');
 
-    // Step 6b: Populate the proved transfer transaction
+    // Debug: Check what's in the proof cache
+    console.log('🔍 Debugging proof details...');
+    const proofCache = await import('@railgun-community/wallet').then(m => m as any);
+    console.log('   Proof cache keys available:', Object.keys(proofCache).filter(k => k.includes('proof') || k.includes('Proof')));
+    console.log();
+
+    // Step 6c: Populate the proved transfer transaction
     console.log('📝 Preparing transfer transaction...');
 
     const { chain } = NETWORK_CONFIG[NETWORK_NAME];
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
     const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-
-    // Get gas details
-    const feeData = await provider.getFeeData();
-    const evmGasType = getEVMGasTypeForTransaction(NETWORK_NAME, true); // true = using public wallet
 
     const gasDetails: TransactionGasDetails = {
       evmGasType,
@@ -557,8 +596,8 @@ async function privateTransfer(
       erc20AmountRecipients,
       [], // nftAmountRecipients
       undefined, // broadcasterFeeERC20AmountRecipient
-      true, // sendWithPublicWallet - TRUE because we're signing with our own wallet for testing
-      undefined, // overallBatchMinGasPrice
+      true, // sendWithPublicWallet - TRUE = we (public EOA) will sign and send this tx
+      overallBatchMinGasPrice, // MUST match what was used in proof generation!
       gasDetails,
     );
 
@@ -575,15 +614,54 @@ async function privateTransfer(
     // Set nonce explicitly
     transferResult.transaction.nonce = await wallet.getNonce('latest');
 
-    // Ensure all required fields are present
-    const txToSend = {
-      ...transferResult.transaction,
-      from: wallet.address, // Add from field explicitly
+    // Ensure all required fields are present and remove undefined fields
+    const txToSend: any = {
+      to: transferResult.transaction.to,
+      data: transferResult.transaction.data,
+      value: 0n,
+      gasLimit: transferResult.transaction.gasLimit,
+      nonce: transferResult.transaction.nonce,
+      type: transferResult.transaction.type,
     };
+
+    // Add Type 2 (EIP-1559) gas fields if present
+    if (transferResult.transaction.maxFeePerGas) {
+      txToSend.maxFeePerGas = transferResult.transaction.maxFeePerGas;
+    }
+    if (transferResult.transaction.maxPriorityFeePerGas) {
+      txToSend.maxPriorityFeePerGas = transferResult.transaction.maxPriorityFeePerGas;
+    }
+    // Add Type 1 (legacy) gas field if present
+    if (transferResult.transaction.gasPrice) {
+      txToSend.gasPrice = transferResult.transaction.gasPrice;
+    }
 
     console.log('   Final tx data length:', txToSend.data?.length || 0);
     console.log('   Final tx from:', txToSend.from);
     console.log('   Final tx to:', txToSend.to);
+    console.log('   Final tx type:', txToSend.type);
+    console.log('   Final tx gasPrice:', txToSend.gasPrice);
+    console.log('   Final tx gasLimit:', txToSend.gasLimit);
+    console.log('   Final tx nonce:', txToSend.nonce);
+    console.log('   All tx fields:', Object.keys(txToSend));
+    console.log('   Data starts with:', txToSend.data?.substring(0, 66));
+
+    // Try to get better error info by calling the contract directly first
+    console.log('\n🔍 Testing transaction call (eth_call) before sending...');
+    try {
+      await provider.call({
+        to: txToSend.to,
+        data: txToSend.data,
+        from: txToSend.from,
+      });
+      console.log('   ✅ eth_call succeeded - transaction should work');
+    } catch (callError: any) {
+      console.log('   ❌ eth_call failed:', callError.message);
+      console.log('   This indicates the transaction will revert');
+      if (callError.data) {
+        console.log('   Revert data:', callError.data);
+      }
+    }
 
     const tx = await wallet.sendTransaction(txToSend);
     console.log('   Transaction hash:', tx.hash);
@@ -660,7 +738,8 @@ async function main() {
         console.log('   Wait 1 hour after shielding, then try again.');
         console.log('\n⏰ IMPORTANT: The 1-hour POI validation countdown starts from your MOST RECENT shield.');
         console.log('   Even old shields may not be spendable if POI aggregator lacks historical proofs.');
-        return;
+        console.log();
+        process.exit(0);
       } else {
         console.log('   No shielded funds found. Need to shield tokens first.');
         console.log('   (Note: After shielding, wait 1 hour for POI validation before transfers)\n');
@@ -670,7 +749,8 @@ async function main() {
 
         console.log('\n⏰ IMPORTANT: Shielded funds require 1-hour POI validation period.');
         console.log('   Please run this script again in 1 hour to test the transfer.');
-        return;
+        console.log();
+        process.exit(0);
       }
     } else {
       console.log('   ✅ Using existing spendable balance (past POI validation period)\n');
