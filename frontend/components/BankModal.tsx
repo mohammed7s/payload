@@ -1,7 +1,7 @@
 "use client";
 
 import { X, AlertCircle, Landmark, ExternalLink } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useChainId } from "wagmi";
 
 interface BankModalProps {
@@ -17,11 +17,6 @@ export function BankModal({ isOpen, onClose, ethereumAddress }: BankModalProps) 
   const [selectedProvider, setSelectedProvider] = useState<OfframpProvider | null>(null);
   const [amount, setAmount] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleProviderSelect = (provider: OfframpProvider) => {
     setSelectedProvider(provider);
@@ -37,13 +32,13 @@ export function BankModal({ isOpen, onClose, ethereumAddress }: BankModalProps) 
     }
   };
 
-  if (!isOpen || !mounted) return null;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-border max-w-lg w-full">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-black border border-border max-w-lg w-full my-8 max-h-[calc(100vh-4rem)] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
           <div className="flex items-center space-x-3">
             <Landmark className="w-5 h-5" />
             <h2 className="text-xl font-bold">Send USDC to Bank Account</h2>
@@ -58,7 +53,7 @@ export function BankModal({ isOpen, onClose, ethereumAddress }: BankModalProps) 
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Provider Selection */}
           <div>
             <label className="block text-sm text-muted mb-3">Select Off-ramp Provider</label>

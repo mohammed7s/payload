@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payload Cover Image</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .cover-container {
+      width: 640px;
+      height: 360px;
+      background: #ffffff;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .cover-content {
+      position: relative;
+      z-index: 2;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 40px;
+      gap: 50px;
+    }
+
+    .header {
+      text-align: center;
+    }
+
+    .title {
+      font-size: 72px;
+      font-weight: 700;
+      color: #000000;
+      letter-spacing: -2px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .empty-set {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 700;
+      font-size: 72px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+    }
+
+    .logo-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 40px;
+    }
+
+    .logo-row img {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .logo-row svg {
+      height: 48px;
+      width: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="cover-container">
+    <div class="cover-content">
+      <!-- Header -->
+      <div class="header">
+        <h1 class="title">PAYL<span class="empty-set">∅</span>AD</h1>
+        <p class="subtitle">Private Ethereum Payroll</p>
+      </div>
+
+      <!-- Logo Row -->
+      <div class="logo-row">
+        <!-- RAILGUN Logo -->
+        <img src="frontend/public/railgun.png" alt="RAILGUN">
+
+        <!-- Ethereum Logo -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 417" style="height: 52px;">
+          <path fill="#627EEA" d="M127.961 0l-2.795 9.5v275.668l2.795 2.79 127.962-75.638z"/>
+          <path fill="#8A92B2" d="M127.962 0L0 212.32l127.962 75.639V154.158z"/>
+          <path fill="#627EEA" d="M127.961 312.187l-1.575 1.92v98.199l1.575 4.6L256 236.587z"/>
+          <path fill="#8A92B2" d="M127.962 416.905v-104.72L0 236.585z"/>
+          <path fill="#8A92B2" d="M127.961 287.958l127.96-75.637-127.96-58.162z"/>
+          <path fill="#62688F" d="M0 212.32l127.96 75.638v-133.8z"/>
+        </svg>
+
+        <!-- USDC Logo -->
+        <img src="frontend/public/usdc-logo.png" alt="USDC">
+
+        <!-- PayPal/PYUSD Logo -->
+        <img src="frontend/public/paypal-icon.svg" alt="PYUSD">
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 20px; text-align: center; color: #666; font-size: 14px; font-family: ui-monospace, monospace;">
+    <p>Right-click the image above and "Save Image As..." to download (640x360px)</p>
+    <p style="margin-top: 8px; font-size: 12px;">Or take a screenshot of just the cover area</p>
+  </div>
+</body>
+</html>

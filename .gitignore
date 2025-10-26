@@ -9,6 +9,8 @@ node_modules/
 # Database (contains wallet keys and merkletree data)
 db/
 db-*/
+backend/data/
+backend/data/railgun-wallet.db/
 
 # Build outputs
 dist/

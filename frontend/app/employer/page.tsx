@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, Shield, ArrowRight, Plus, Mail, Upload, ChevronDown } from "lucide-react";
+import Image from "next/image";
+import { Wallet, Shield, ArrowRight, Plus, Mail, Upload, ChevronDown, Send } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 import { useTokenBalances } from "@/hooks/useTokenBalances";
 import { useRailgunWallet } from "@/hooks/useRailgunWallet";
@@ -12,7 +13,20 @@ import { AddEmployeeModal } from "@/components/AddEmployeeModal";
 import { InviteEmployeeModal } from "@/components/InviteEmployeeModal";
 import { ImportCSVModal } from "@/components/ImportCSVModal";
 import { EditEmployeeModal } from "@/components/EditEmployeeModal";
+import { PayrollExecutionModal } from "@/components/PayrollExecutionModal";
 import { TokenLogo } from "@/components/TokenLogo";
+
+// Token configuration (Sepolia testnet)
+const TOKEN_CONFIG: Record<string, { address: string; decimals: number }> = {
+  USDC: {
+    address: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", // USDC on Sepolia
+    decimals: 6,
+  },
+  PYUSD: {
+    address: "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9", // PYUSD on Sepolia
+    decimals: 6,
+  },
+};
 
 export default function EmployerDashboard() {
   const [selectedToken, setSelectedToken] = useState("USDC");
@@ -21,43 +35,30 @@ export default function EmployerDashboard() {
   const [isInviteEmployeeOpen, setIsInviteEmployeeOpen] = useState(false);
   const [isImportCSVOpen, setIsImportCSVOpen] = useState(false);
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
+  const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [showAddOptions, setShowAddOptions] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { balances, isLoading } = useTokenBalances();
   const { railgunWallet, isLoading: railgunLoading, error: railgunError } = useRailgunWallet();
 
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   // Get shielded balances
-  const { balance: shieldedUSDC, isLoading: loadingUSDC } = useShieldedBalance('USDC', chainId);
-  const { balance: shieldedPYUSD, isLoading: loadingPYUSD } = useShieldedBalance('PYUSD', chainId);
+  const { balance: shieldedUSDC, isLoading: loadingUSDC, refetch: refetchUSDC } = useShieldedBalance('USDC', chainId);
+  const { balance: shieldedPYUSD, isLoading: loadingPYUSD, refetch: refetchPYUSD } = useShieldedBalance('PYUSD', chainId);
 
   // Get employees
   const { employees, isLoading: loadingEmployees, error: employeesError, refetch: refetchEmployees } = useEmployees(address);
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-black text-white p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center py-20">
-            <p className="text-muted">Loading...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Get ETH balance
   const ethBalance = balances.find((b) => b.symbol === "ETH");
 
   // Get token balances (USDC, PYUSD)
   const tokenBalances = balances.filter((b) => b.symbol !== "ETH");
+
+  // Get current token balance
+  const currentTokenBalance = tokenBalances.find((b) => b.symbol === selectedToken);
+  const currentShieldedBalance = selectedToken === "USDC" ? shieldedUSDC : shieldedPYUSD;
 
   return (
     <div className="p-8 space-y-8">
@@ -112,14 +113,41 @@ export default function EmployerDashboard() {
                   {/* Always show tokens */}
                   {tokenBalances.length > 0 ? (
                     tokenBalances.map((token) => (
-                      <p key={token.symbol} className="text-lg font-semibold">
-                        {token.formatted} {token.symbol}
-                      </p>
+                      <div key={token.symbol} className="flex items-center gap-2">
+                        <Image
+                          src={token.symbol === "USDC" ? "/usdc-logo.png" : "/paypal-icon.svg"}
+                          alt={`${token.symbol} logo`}
+                          width={20}
+                          height={20}
+                          className="rounded-full"
+                        />
+                        <p className="text-lg font-semibold">
+                          {token.formatted} {token.symbol}
+                        </p>
+                      </div>
                     ))
                   ) : (
                     <>
-                      <p className="text-lg font-semibold text-muted">0.00 USDC</p>
-                      <p className="text-lg font-semibold text-muted">0.00 PYUSD</p>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src="/usdc-logo.png"
+                          alt="USDC logo"
+                          width={20}
+                          height={20}
+                          className="rounded-full"
+                        />
+                        <p className="text-lg font-semibold text-muted">0.00 USDC</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Image
+                          src="/paypal-icon.svg"
+                          alt="PYUSD logo"
+                          width={20}
+                          height={20}
+                          className="rounded-full"
+                        />
+                        <p className="text-lg font-semibold text-muted">0.00 PYUSD</p>
+                      </div>
                     </>
                   )}
                 </div>
@@ -151,10 +179,28 @@ export default function EmployerDashboard() {
                 {loadingUSDC || loadingPYUSD ? (
                   <h3 className="text-2xl font-bold text-muted">Loading...</h3>
                 ) : (
-                  <>
-                    <h3 className="text-2xl font-bold">{shieldedUSDC} USDC</h3>
-                    <p className="text-lg font-semibold text-muted">{shieldedPYUSD} PYUSD</p>
-                  </>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src="/usdc-logo.png"
+                        alt="USDC logo"
+                        width={24}
+                        height={24}
+                        className="rounded-full"
+                      />
+                      <h3 className="text-2xl font-bold">{shieldedUSDC} USDC</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Image
+                        src="/paypal-icon.svg"
+                        alt="PYUSD logo"
+                        width={20}
+                        height={20}
+                        className="rounded-full"
+                      />
+                      <p className="text-lg font-semibold text-muted">{shieldedPYUSD} PYUSD</p>
+                    </div>
+                  </div>
                 )}
               </div>
               <Shield className="w-5 h-5 text-green-500" />
@@ -313,77 +359,111 @@ export default function EmployerDashboard() {
       </div>
 
       {/* Section 3: Payroll Processing */}
-      <div className="border border-border rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-6">Process Payroll</h2>
-
-        {/* Token Selection */}
-        <div className="mb-6">
-          <label className="text-xs text-muted uppercase tracking-wide block mb-2">
-            Select Token
-          </label>
-          <div className="flex space-x-4">
-            {["USDC", "PYUSD"].map((token) => (
-              <button
-                key={token}
-                onClick={() => setSelectedToken(token)}
-                className={`
-                  px-6 py-3 rounded border transition-colors
-                  ${
-                    selectedToken === token
-                      ? "bg-white text-black border-white"
-                      : "border-border hover:border-white/50"
-                  }
-                `}
-              >
-                {token}
-              </button>
-            ))}
-          </div>
+      <div className="border border-border rounded-lg overflow-hidden">
+        <div className="bg-black border-b border-border p-6">
+          <h2 className="text-lg font-semibold mb-2">Process Payroll</h2>
+          <p className="text-xs text-muted">
+            Execute private batch payments to your employees
+          </p>
         </div>
 
-        {/* Steps */}
-        <div className="space-y-4">
-          {/* Step 1: Shield */}
-          <div className="border border-border rounded-lg p-4 hover:bg-white/5 transition-colors cursor-pointer">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold">
-                  1
-                </div>
-                <div>
-                  <h3 className="font-semibold">Shield Tokens</h3>
-                  <p className="text-xs text-muted">
-                    Make {selectedToken} private using RAILGUN
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-5 h-5 text-muted" />
+        <div className="p-6">
+          {/* Token Selection */}
+          <div className="mb-6">
+            <label className="text-xs text-muted uppercase tracking-wide block mb-3">
+              Payment Token
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {["USDC", "PYUSD"].map((token) => {
+                const balance = tokenBalances.find((b) => b.symbol === token);
+                const shieldedBalance = token === "USDC" ? shieldedUSDC : shieldedPYUSD;
+                const employeeCount = employees.filter(
+                  e => e.status === 'active' && e.tokenSymbol === token
+                ).length;
+
+                return (
+                  <button
+                    key={token}
+                    onClick={() => setSelectedToken(token)}
+                    className={`
+                      p-4 rounded-lg border-2 transition-all text-left
+                      ${
+                        selectedToken === token
+                          ? "border-white bg-white/5"
+                          : "border-border hover:border-white/50"
+                      }
+                    `}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <TokenLogo symbol={token as 'USDC' | 'PYUSD'} size={20} />
+                        <span className="font-semibold">{token}</span>
+                      </div>
+                      {selectedToken === token && (
+                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted">Ethereum:</span>
+                        <span className="font-mono">{balance?.formatted || "0.00"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted">RAILGUN:</span>
+                        <span className="font-mono text-green-400">{shieldedBalance}</span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-border/50">
+                        <span className="text-muted">Employees:</span>
+                        <span className="font-semibold">{employeeCount}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Step 2: Transfer */}
-          <div className="border border-border rounded-lg p-4 hover:bg-white/5 transition-colors cursor-pointer">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold">
-                  2
-                </div>
-                <div>
-                  <h3 className="font-semibold">Transfer Payroll</h3>
-                  <p className="text-xs text-muted">
-                    Send private payments to all employees
-                  </p>
-                </div>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-white/5 border border-border rounded-lg p-3">
+              <div className="text-xs text-muted mb-1">Active Employees</div>
+              <div className="text-xl font-bold">
+                {employees.filter(e => e.status === 'active' && e.tokenSymbol === selectedToken).length}
               </div>
-              <ArrowRight className="w-5 h-5 text-muted" />
+            </div>
+            <div className="bg-white/5 border border-border rounded-lg p-3">
+              <div className="text-xs text-muted mb-1">Total Monthly</div>
+              <div className="text-xl font-bold">
+                {employees
+                  .filter(e => e.status === 'active' && e.tokenSymbol === selectedToken)
+                  .reduce((sum, emp) => sum + parseFloat(emp.salary || '0'), 0)
+                  .toFixed(2)}
+              </div>
+            </div>
+            <div className="bg-white/5 border border-border rounded-lg p-3">
+              <div className="text-xs text-muted mb-1">Available</div>
+              <div className="text-xl font-bold text-green-400">
+                {currentShieldedBalance}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Process Button */}
-        <button className="w-full mt-6 bg-white text-black py-4 font-semibold hover:bg-gray-200 transition-colors rounded">
-          Process Payroll Batch
-        </button>
+          {/* Process Button */}
+          <button
+            onClick={() => setIsPayrollModalOpen(true)}
+            disabled={!isConnected || !railgunWallet || employees.filter(e => e.status === 'active' && e.tokenSymbol === selectedToken).length === 0}
+            className="w-full bg-white text-black py-4 font-semibold hover:bg-gray-200 transition-colors rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+          >
+            <Send className="w-4 h-4" />
+            <span>Process {selectedToken} Payroll</span>
+          </button>
+
+          {(!isConnected || !railgunWallet) && (
+            <p className="text-xs text-center text-muted mt-3">
+              {!isConnected ? "Connect your wallet to continue" : "Waiting for RAILGUN wallet..."}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Shield Modal */}
@@ -438,6 +518,26 @@ export default function EmployerDashboard() {
         employee={selectedEmployee}
         onSuccess={() => {
           refetchEmployees();
+        }}
+      />
+
+      {/* Payroll Execution Modal */}
+      <PayrollExecutionModal
+        isOpen={isPayrollModalOpen}
+        onClose={() => setIsPayrollModalOpen(false)}
+        employees={employees}
+        selectedToken={selectedToken}
+        ethereumBalance={currentTokenBalance?.formatted || "0.00"}
+        railgunBalance={currentShieldedBalance || "0.00"}
+        tokenAddress={TOKEN_CONFIG[selectedToken].address}
+        tokenDecimals={TOKEN_CONFIG[selectedToken].decimals}
+        onBalanceUpdate={() => {
+          // Refetch the appropriate shielded balance after shielding
+          if (selectedToken === "USDC") {
+            refetchUSDC();
+          } else {
+            refetchPYUSD();
+          }
         }}
       />
     </div>

@@ -105,3 +105,18 @@ export async function getShieldedBalance(
     return null;
   }
 }
+
+/**
+ * Refresh POI status for user's wallet
+ */
+export async function refreshPOIStatus(ethereumAddress: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/railgun/poi/refresh/${ethereumAddress}`,
+    { method: 'POST' }
+  );
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || 'Failed to refresh POI status');
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Modal } from "./Modal";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
@@ -23,18 +23,9 @@ export function ShieldModal({ isOpen, onClose, railgunAddress }: ShieldModalProp
   const [step, setStep] = useState<"input" | "approve" | "shield" | "success">("input");
   const [error, setError] = useState("");
   const [txHash, setTxHash] = useState("");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const tokenConfig = getTokenConfig(chainId, selectedToken);
   const tokenAddress = tokenConfig?.address || "";
-
-  if (!mounted) {
-    return null;
-  }
 
   const handleShield = async () => {
     if (!address || !amount) return;

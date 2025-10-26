@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Github, FileText } from "lucide-react";
 
 export default function LandingPage() {
@@ -9,10 +10,14 @@ export default function LandingPage() {
       {/* Header */}
       <header className="border-b border-border p-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 border-2 border-white flex items-center justify-center">
-              <span className="text-sm font-bold">P</span>
-            </div>
+          <div className="flex items-center space-x-3">
+            <Image
+              src="/logo.jpeg"
+              alt="Payload Logo"
+              width={40}
+              height={40}
+              className="rounded"
+            />
             <span className="text-xl font-bold tracking-tight">PAYLOAD</span>
           </div>
 

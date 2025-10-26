@@ -1,7 +1,7 @@
 "use client";
 
 import { X, AlertCircle, Wallet } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 
 interface PayPalModalProps {
@@ -18,11 +18,6 @@ export function PayPalModal({ isOpen, onClose, ethereumAddress }: PayPalModalPro
   const [isProcessing, setIsProcessing] = useState(false);
   const [txStatus, setTxStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleSendToPayPal = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -82,13 +77,13 @@ export function PayPalModal({ isOpen, onClose, ethereumAddress }: PayPalModalPro
     }
   };
 
-  if (!isOpen || !mounted) return null;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-black border border-border max-w-lg w-full">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-black border border-border max-w-lg w-full my-8 max-h-[calc(100vh-4rem)] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
           <div className="flex items-center space-x-3">
             <Wallet className="w-5 h-5" />
             <h2 className="text-xl font-bold">Send PYUSD to PayPal</h2>
@@ -103,7 +98,7 @@ export function PayPalModal({ isOpen, onClose, ethereumAddress }: PayPalModalPro
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Info Banner */}
           <div className="border border-blue-500 bg-blue-500/10 p-4">
             <div className="flex items-start space-x-3">

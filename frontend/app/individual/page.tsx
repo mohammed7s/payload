@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Shield, Eye, Download, ArrowDown, Send, Landmark, Wallet } from "lucide-react";
 import { useRailgunWallet } from "@/hooks/useRailgunWallet";
 import { useAccount, useChainId } from "wagmi";
@@ -101,7 +102,16 @@ export default function IndividualPage() {
             <div className="grid grid-cols-2 gap-8 mb-6">
               {/* USDC Balance */}
               <div>
-                <p className="text-xs text-muted mb-1">USDC</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <Image
+                    src="/usdc-logo.png"
+                    alt="USDC logo"
+                    width={20}
+                    height={20}
+                    className="rounded-full"
+                  />
+                  <p className="text-xs text-muted">USDC</p>
+                </div>
                 {loadingUSDC ? (
                   <h2 className="text-3xl font-bold text-muted">Loading...</h2>
                 ) : (
@@ -111,7 +121,16 @@ export default function IndividualPage() {
 
               {/* PYUSD Balance */}
               <div>
-                <p className="text-xs text-muted mb-1">PYUSD</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <Image
+                    src="/paypal-icon.svg"
+                    alt="PYUSD logo"
+                    width={20}
+                    height={20}
+                    className="rounded-full"
+                  />
+                  <p className="text-xs text-muted">PYUSD</p>
+                </div>
                 {loadingPYUSD ? (
                   <h2 className="text-3xl font-bold text-muted">Loading...</h2>
                 ) : (

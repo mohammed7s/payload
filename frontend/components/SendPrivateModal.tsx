@@ -1,7 +1,7 @@
 "use client";
 
 import { X, AlertCircle, Send } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useChainId } from "wagmi";
 import { getTokenConfig, type TokenSymbol } from "@/lib/tokens";
 
@@ -19,11 +19,6 @@ export function SendPrivateModal({ isOpen, onClose, ethereumAddress }: SendPriva
   const [isProcessing, setIsProcessing] = useState(false);
   const [txStatus, setTxStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const tokenConfig = getTokenConfig(chainId, selectedToken);
 
@@ -85,7 +80,7 @@ export function SendPrivateModal({ isOpen, onClose, ethereumAddress }: SendPriva
     }
   };
 
-  if (!isOpen || !mounted) return null;
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">

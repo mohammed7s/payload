@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { getShieldedBalance } from '@/services/railgun';
 import { getTokenConfig } from '@/lib/tokens';
@@ -8,6 +8,11 @@ export function useShieldedBalance(tokenSymbol: 'USDC' | 'PYUSD', chainId?: numb
   const [balance, setBalance] = useState<string>('0.00');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
 
   useEffect(() => {
     async function fetchBalance() {
@@ -42,7 +47,7 @@ export function useShieldedBalance(tokenSymbol: 'USDC' | 'PYUSD', chainId?: numb
     }
 
     fetchBalance();
-  }, [address, tokenSymbol, chainId]);
+  }, [address, tokenSymbol, chainId, refreshTrigger]);
 
-  return { balance, isLoading, error };
+  return { balance, isLoading, error, refetch };
 }

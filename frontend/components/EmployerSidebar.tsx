@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileCheck, BarChart3, Settings } from "lucide-react";
+import { LayoutDashboard, Users, FileCheck, BarChart3, Settings, Receipt } from "lucide-react";
 import { ViewSwitcher } from "./ViewSwitcher";
 
 const menuItems = [
   { name: "Dashboard", href: "/employer", icon: LayoutDashboard },
   { name: "Employees", href: "/employer/employees", icon: Users },
+  { name: "Transactions", href: "/employer/transactions", icon: Receipt },
   { name: "Compliance", href: "/employer/compliance", icon: FileCheck },
   { name: "Reports", href: "/employer/reports", icon: BarChart3 },
   { name: "Settings", href: "/employer/settings", icon: Settings },
@@ -22,10 +24,14 @@ export default function EmployerSidebar() {
       <div className="space-y-4 mb-8">
         {/* Logo */}
         <div>
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 border-2 border-white flex items-center justify-center">
-              <span className="text-sm font-bold">P</span>
-            </div>
+          <Link href="/" className="flex items-center space-x-3">
+            <Image
+              src="/logo.jpeg"
+              alt="Payload Logo"
+              width={32}
+              height={32}
+              className="rounded"
+            />
             <span className="text-lg font-bold">PAYLOAD</span>
           </Link>
           <p className="text-xs text-muted mt-2 uppercase tracking-wider">Employer View</p>
