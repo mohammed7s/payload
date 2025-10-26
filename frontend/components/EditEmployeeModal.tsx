@@ -3,6 +3,7 @@
 import { X, Edit } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TokenLogo } from "./TokenLogo";
+import { buildApiUrl } from "@/lib/api";
 
 interface Employee {
   id: string;
@@ -63,7 +64,7 @@ export function EditEmployeeModal({ isOpen, onClose, employee, onSuccess }: Edit
     setErrorMessage("");
 
     try {
-      const response = await fetch(`http://localhost:3001/api/employees/${employee.id}`, {
+      const response = await fetch(buildApiUrl(`api/employees/${employee.id}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -105,7 +106,7 @@ export function EditEmployeeModal({ isOpen, onClose, employee, onSuccess }: Edit
     setErrorMessage("");
 
     try {
-      const response = await fetch(`http://localhost:3001/api/employees/${employee.id}`, {
+      const response = await fetch(buildApiUrl(`api/employees/${employee.id}`), {
         method: "DELETE",
       });
 

@@ -3,6 +3,7 @@
 import { X, AlertCircle, Wallet } from "lucide-react";
 import { useState } from "react";
 import { useAccount, useChainId } from "wagmi";
+import { buildApiUrl } from "@/lib/api";
 
 interface PayPalModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export function PayPalModal({ isOpen, onClose, ethereumAddress }: PayPalModalPro
     setErrorMessage("");
 
     try {
-      const response = await fetch("http://localhost:3001/api/unshield", {
+      const response = await fetch(buildApiUrl("api/unshield"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

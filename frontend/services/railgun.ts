@@ -3,7 +3,7 @@
  * Simple service to interact with our RAILGUN backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { API_BASE_URL, buildApiUrl } from '@/lib/api';
 
 export interface RailgunWallet {
   railgunWalletId: string;
@@ -24,7 +24,7 @@ export interface ShieldTransaction {
  * Connect wallet - creates or retrieves RAILGUN wallet
  */
 export async function connectRailgunWallet(ethereumAddress: string): Promise<RailgunWallet> {
-  const response = await fetch(`${API_BASE_URL}/api/railgun/connect`, {
+  const response = await fetch(buildApiUrl('api/railgun/connect'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ethereumAddress }),
@@ -46,7 +46,7 @@ export async function generateShieldTransaction(
   tokenAddress: string,
   amount: string
 ): Promise<ShieldTransaction> {
-  const response = await fetch(`${API_BASE_URL}/api/railgun/shield`, {
+  const response = await fetch(buildApiUrl('api/railgun/shield'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -72,7 +72,7 @@ export async function generateShieldTransaction(
  */
 export async function getRailgunWallet(ethereumAddress: string): Promise<RailgunWallet | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/railgun/wallet/${ethereumAddress}`);
+    const response = await fetch(buildApiUrl(`api/railgun/wallet/${ethereumAddress}`));
     if (!response.ok) return null;
 
     const data = await response.json();
@@ -94,8 +94,8 @@ export async function getShieldedBalance(
   symbol: string;
 } | null> {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/railgun/balance/${ethereumAddress}/${tokenAddress}`
+  const response = await fetch(
+      buildApiUrl(`api/railgun/balance/${ethereumAddress}/${tokenAddress}`)
     );
     if (!response.ok) return null;
 
@@ -111,7 +111,7 @@ export async function getShieldedBalance(
  */
 export async function refreshPOIStatus(ethereumAddress: string): Promise<void> {
   const response = await fetch(
-    `${API_BASE_URL}/api/railgun/poi/refresh/${ethereumAddress}`,
+    buildApiUrl(`api/railgun/poi/refresh/${ethereumAddress}`),
     { method: 'POST' }
   );
 

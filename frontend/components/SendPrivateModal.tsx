@@ -4,6 +4,7 @@ import { X, AlertCircle, Send } from "lucide-react";
 import { useState } from "react";
 import { useChainId } from "wagmi";
 import { getTokenConfig, type TokenSymbol } from "@/lib/tokens";
+import { buildApiUrl } from "@/lib/api";
 
 interface SendPrivateModalProps {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export function SendPrivateModal({ isOpen, onClose, ethereumAddress }: SendPriva
     setErrorMessage("");
 
     try {
-      const response = await fetch("http://localhost:3001/api/send-private", {
+      const response = await fetch(buildApiUrl("api/send-private"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

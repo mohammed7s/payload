@@ -38,10 +38,15 @@ export default function EmployerDashboard() {
   const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [showAddOptions, setShowAddOptions] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { balances, isLoading } = useTokenBalances();
   const { railgunWallet, isLoading: railgunLoading, error: railgunError } = useRailgunWallet();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Get shielded balances
   const { balance: shieldedUSDC, isLoading: loadingUSDC, refetch: refetchUSDC } = useShieldedBalance('USDC', chainId);
@@ -59,6 +64,17 @@ export default function EmployerDashboard() {
   // Get current token balance
   const currentTokenBalance = tokenBalances.find((b) => b.symbol === selectedToken);
   const currentShieldedBalance = selectedToken === "USDC" ? shieldedUSDC : shieldedPYUSD;
+
+  if (!mounted) {
+    return (
+      <div className="p-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-800 rounded w-1/4"></div>
+          <div className="h-4 bg-gray-800 rounded w-1/2"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-8">

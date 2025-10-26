@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { buildApiUrl } from '@/lib/api';
 
 interface Employee {
   id: string;
@@ -27,7 +28,7 @@ export function useEmployees(employerAddress: string | undefined) {
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:3001/api/employees/${employerAddress}`);
+      const response = await fetch(buildApiUrl(`api/employees/${employerAddress}`));
       const data = await response.json();
 
       if (!response.ok) {

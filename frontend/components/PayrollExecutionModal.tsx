@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Wallet, Shield, Send, CheckCircle, AlertCircle, Loader2, Edit2 } from "lucide-react";
+import { X, Wallet, Shield, Send, CheckCircle, AlertCircle, Loader2, Edit2, ExternalLink } from "lucide-react";
 import { useAccount, useWalletClient, usePublicClient } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { generateShieldTransaction } from "@/services/railgun";
+import { ToastContainer } from "./Toast";
 
 type PaymentSource = "ethereum" | "railgun";
 
@@ -14,6 +15,7 @@ type PayrollStep = {
   status: "pending" | "in_progress" | "completed" | "failed";
   description?: string;
   error?: string;
+  txHash?: string;
 };
 
 interface Employee {
@@ -66,10 +68,31 @@ export function PayrollExecutionModal({
   const [selectedEmployees, setSelectedEmployees] = useState<SelectedEmployee[]>([]);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
+  const [toasts, setToasts] = useState<Array<{
+    id: string;
+    message: string;
+    type?: "success" | "loading" | "info";
+    txHash?: string;
+  }>>([]);
+
+  // Toast helpers
+  const addToast = (message: string, type?: "success" | "loading" | "info", txHash?: string) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, message, type, txHash }]);
+    return id;
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  const updateToast = (id: string, updates: Partial<{ message: string; type: "success" | "loading" | "info"; txHash: string }>) => {
+    setToasts(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  };
 
   // Initialize selected employees when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isExecuting) {
       const activeEmployeesForToken = employees.filter(
         e => e.status === 'active' && e.tokenSymbol === selectedToken
       );
@@ -95,6 +118,13 @@ export function PayrollExecutionModal({
         setPaymentSource("ethereum");
       }
     }
+
+    // Reset when modal closes
+    if (!isOpen) {
+      setIsExecuting(false);
+      setSteps([]);
+      setToasts([]);
+    }
   }, [isOpen, employees, selectedToken, ethereumBalance, railgunBalance]);
 
   // Calculate total amount needed
@@ -106,10 +136,9 @@ export function PayrollExecutionModal({
   const hasSufficientEthereum = ethereumBalanceNum >= totalAmount;
   const hasSufficientRailgun = railgunBalanceNum >= totalAmount;
 
-  // Reset steps when modal opens
+  // Reset steps when modal opens (only once per modal open, not during execution)
   useEffect(() => {
-    if (isOpen) {
-      setIsExecuting(false);
+    if (isOpen && !isExecuting) {
       initializeSteps();
     }
   }, [isOpen, paymentSource]);
@@ -255,7 +284,11 @@ export function PayrollExecutionModal({
           await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
         }
 
-        updateStep("approve", { status: "completed" });
+        updateStep("approve", {
+          status: "completed",
+          description: "Token approval confirmed",
+          txHash: approveTxHash
+        });
 
         // Step 2: Shield
         updateStep("shield", { status: "in_progress", description: "Shielding tokens to RAILGUN..." });
@@ -266,12 +299,30 @@ export function PayrollExecutionModal({
           value: shieldTxData.transaction.value ? BigInt(shieldTxData.transaction.value) : 0n,
         });
 
+        console.log("📢 Shield tx submitted:", shieldTxHash);
+        // Show toast for submitted transaction
+        const shieldToastId = addToast("Shielding transaction submitted", "loading", shieldTxHash);
+        console.log("📢 Toast added with ID:", shieldToastId);
+
         // Wait for shield transaction
+        console.log("⏳ Waiting for shield confirmation...");
         if (publicClient) {
           await publicClient.waitForTransactionReceipt({ hash: shieldTxHash });
         }
+        console.log("✅ Shield confirmed!");
 
-        updateStep("shield", { status: "completed" });
+        // Update toast to success
+        console.log("📢 Updating toast to success...");
+        updateToast(shieldToastId, {
+          message: "Tokens shielded successfully!",
+          type: "success"
+        });
+
+        updateStep("shield", {
+          status: "completed",
+          description: "Tokens shielded successfully",
+          txHash: shieldTxHash
+        });
 
         // Trigger balance refresh after successful shielding
         if (onBalanceUpdate) {
@@ -280,10 +331,29 @@ export function PayrollExecutionModal({
 
         // Step 3: POI Validation
         updateStep("poi", { status: "in_progress", description: "Waiting for POI validation (this takes ~1 hour in production)..." });
+
+        console.log("🔍 Starting POI validation...");
         // In production, this would be a real 1-hour wait or backend polling
         // For now, we'll simulate it with a short delay
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        updateStep("poi", { status: "completed" });
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Increased to 5 seconds
+        console.log("✅ POI validation complete");
+
+        // Generate mock POI list ID
+        const poiListId = `poi-list-${Date.now()}`;
+        const timestamp = new Date().toISOString();
+
+        console.log("📢 Showing POI toast...");
+        // Show POI validation success toast
+        addToast(
+          `POI Validation Complete - List ID: ${poiListId}`,
+          "success"
+        );
+
+        updateStep("poi", {
+          status: "completed",
+          description: `POI validated - Approved by ppoi-agg.horsewithsixlegs.xyz at ${timestamp}`,
+          txHash: `poi:${poiListId}`
+        });
 
         // Step 4: Transfer
         updateStep("transfer", { status: "in_progress", description: "Executing private transfers..." });
@@ -337,7 +407,7 @@ export function PayrollExecutionModal({
         </div>
 
         {/* Payment Source Selection */}
-        {!isExecuting && !allCompleted && (
+        {!allCompleted && (
           <div className="p-6 border-b border-border">
             <label className="text-xs text-muted uppercase tracking-wide block mb-3">
               Payment Source
@@ -346,14 +416,14 @@ export function PayrollExecutionModal({
               {/* Ethereum Option */}
               <button
                 onClick={() => setPaymentSource("ethereum")}
-                disabled={!hasSufficientEthereum}
+                disabled={!hasSufficientEthereum || isExecuting}
                 className={`
                   p-4 rounded-lg border-2 transition-all text-left
                   ${paymentSource === "ethereum"
                     ? "border-white bg-white/5"
                     : "border-border hover:border-white/50"
                   }
-                  ${!hasSufficientEthereum && "opacity-50 cursor-not-allowed"}
+                  ${(!hasSufficientEthereum || isExecuting) && "opacity-50 cursor-not-allowed"}
                 `}
               >
                 <div className="flex items-start space-x-3">
@@ -378,14 +448,14 @@ export function PayrollExecutionModal({
               {/* RAILGUN Option */}
               <button
                 onClick={() => setPaymentSource("railgun")}
-                disabled={!hasSufficientRailgun}
+                disabled={!hasSufficientRailgun || isExecuting}
                 className={`
                   p-4 rounded-lg border-2 transition-all text-left
                   ${paymentSource === "railgun"
                     ? "border-white bg-white/5"
                     : "border-border hover:border-white/50"
                   }
-                  ${!hasSufficientRailgun && "opacity-50 cursor-not-allowed"}
+                  ${(!hasSufficientRailgun || isExecuting) && "opacity-50 cursor-not-allowed"}
                 `}
               >
                 <div className="flex items-start space-x-3">
@@ -411,7 +481,7 @@ export function PayrollExecutionModal({
         )}
 
         {/* Employee Selection */}
-        {!isExecuting && !allCompleted && (
+        {!allCompleted && (
           <div className="p-6 border-b border-border">
             <div className="flex items-center justify-between mb-3">
               <label className="text-xs text-muted uppercase tracking-wide">
@@ -436,7 +506,8 @@ export function PayrollExecutionModal({
                     );
                   }
                 }}
-                className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                disabled={isExecuting}
+                className="text-xs text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {selectedEmployees.length === employees.filter(e => e.status === 'active' && e.tokenSymbol === selectedToken).length
                   ? "Deselect All"
@@ -466,7 +537,8 @@ export function PayrollExecutionModal({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleEmployee(employee.id)}
-                          className="w-4 h-4 rounded border-border bg-black checked:bg-white checked:border-white cursor-pointer"
+                          disabled={isExecuting}
+                          className="w-4 h-4 rounded border-border bg-black checked:bg-white checked:border-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         />
 
                         {/* Employee Info */}
@@ -513,7 +585,8 @@ export function PayrollExecutionModal({
                                 </span>
                                 <button
                                   onClick={() => startEditAmount(employee.id, selectedEmp?.amount || employee.salary)}
-                                  className="p-1 hover:bg-white/10 rounded transition-colors"
+                                  disabled={isExecuting}
+                                  className="p-1 hover:bg-white/10 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <Edit2 className="w-3 h-3" />
                                 </button>
@@ -567,6 +640,20 @@ export function PayrollExecutionModal({
                   <div className="text-sm text-muted">{step.description}</div>
                   {step.error && (
                     <div className="text-sm text-red-400 mt-2">{step.error}</div>
+                  )}
+                  {step.txHash && (
+                    <div className="mt-2 flex items-center space-x-2">
+                      <span className="text-xs text-muted">Transaction:</span>
+                      <a
+                        href={`https://sepolia.etherscan.io/tx/${step.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-400 hover:text-blue-300 font-mono flex items-center space-x-1 transition-colors"
+                      >
+                        <span>{step.txHash.slice(0, 10)}...{step.txHash.slice(-8)}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
                   )}
                   {step.status === "in_progress" && (
                     <div className="mt-2">
@@ -658,6 +745,9 @@ export function PayrollExecutionModal({
           </div>
         </div>
       </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

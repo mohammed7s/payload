@@ -2,6 +2,7 @@
 
 import { X, UserPlus } from "lucide-react";
 import { useState, useEffect } from "react";
+import { buildApiUrl } from "@/lib/api";
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ export function AddEmployeeModal({ isOpen, onClose, employerAddress, onSuccess }
     setErrorMessage("");
 
     try {
-      const response = await fetch("http://localhost:3001/api/employees", {
+      const response = await fetch(buildApiUrl("api/employees"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

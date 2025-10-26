@@ -4,6 +4,7 @@ import { X, AlertCircle, ArrowDown } from "lucide-react";
 import { useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { getTokenConfig, type TokenSymbol } from "@/lib/tokens";
+import { buildApiUrl } from "@/lib/api";
 
 interface UnshieldModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export function UnshieldModal({ isOpen, onClose, ethereumAddress }: UnshieldModa
     setErrorMessage("");
 
     try {
-      const response = await fetch("http://localhost:3001/api/unshield", {
+      const response = await fetch(buildApiUrl("api/unshield"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
