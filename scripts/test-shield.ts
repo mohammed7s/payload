@@ -46,7 +46,7 @@ import {
 } from '@railgun-community/shared-models';
 import leveldown from 'leveldown';
 import fs from 'fs';
-import { setTokenBalance } from './utils/set-token-balance';
+// import { setTokenBalance } from './utils/set-token-balance'; // Only needed for local fork
 
 // ============================================================================
 // CONFIGURATION
@@ -117,7 +117,7 @@ async function setupTokenBalance(): Promise<void> {
       const desiredBalance = 1000n * (10n ** BigInt(decimals));
       console.log(`\nSetting token balance to: ${ethers.formatUnits(desiredBalance, decimals)} ${symbol}`);
 
-      await setTokenBalance(provider, wallet.address, TOKEN_ADDRESS, desiredBalance);
+      // await setTokenBalance(provider, wallet.address, TOKEN_ADDRESS, desiredBalance); // Only for local fork
 
       // Verify the balance was set
       const tokenBalance = await tokenContract.balanceOf(wallet.address);
@@ -245,10 +245,16 @@ async function createWallet(): Promise<{ id: string; address: string }> {
   }
 
   try {
+    // Scan from 2 days ago to detect historical UTXOs
+    // Sepolia: ~7,200 blocks/day, so 2 days = ~14,400 blocks
+    const creationBlockNumbers = {
+      [NetworkName.EthereumSepolia]: 9475000, // ~2 days ago from current block
+    };
+
     const walletInfo = await createRailgunWallet(
       encryptionKey,
       mnemonic,
-      {} // creationBlockNumbers - empty object means start from current block
+      creationBlockNumbers // Scan from 2 days ago to find historical UTXOs
     );
 
     console.log('✅ RAILGUN Wallet Created:');
@@ -309,7 +315,7 @@ async function createEmployeeWallet(): Promise<{ id: string; address: string }> 
 // STEP 4: SHIELD TOKENS
 // ============================================================================
 
-async function shieldTokens(railgunAddress: string): Promise<void> {
+async function shieldTokens(railgunAddress: string, walletId: string): Promise<void> {
   console.log('🛡️  STEP 4: Shielding tokens...\n');
 
   const txidVersion = TXIDVersion.V2_PoseidonMerkle; // Using V2
@@ -396,7 +402,7 @@ async function shieldTokens(railgunAddress: string): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
 
     // Check total balance (including non-spendable)
-    const walletObj = walletForID(employerWalletId);
+    const walletObj = walletForID(walletId);
     const totalBalance = await balanceForERC20Token(
       TXIDVersion.V2_PoseidonMerkle,
       walletObj,
@@ -745,7 +751,7 @@ async function main() {
         console.log('   (Note: After shielding, wait 1 hour for POI validation before transfers)\n');
 
         // Step 4: Shield tokens to employer wallet
-        await shieldTokens(employerWallet.address);
+        await shieldTokens(employerWallet.address, employerWallet.id);
 
         console.log('\n⏰ IMPORTANT: Shielded funds require 1-hour POI validation period.');
         console.log('   Please run this script again in 1 hour to test the transfer.');

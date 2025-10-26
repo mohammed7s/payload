@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Wallet, Shield, ArrowRight, Plus } from "lucide-react";
+import { useAccount, useChainId } from "wagmi";
+import { useTokenBalances } from "@/hooks/useTokenBalances";
+import { useRailgunWallet } from "@/hooks/useRailgunWallet";
+import { useShieldedBalance } from "@/hooks/useShieldedBalance";
+import { ShieldModal } from "@/components/ShieldModal";
 
 // Mock data for now
 const mockEmployees = [
@@ -27,6 +32,39 @@ const mockEmployees = [
 
 export default function EmployerDashboard() {
   const [selectedToken, setSelectedToken] = useState("USDC");
+  const [isShieldModalOpen, setIsShieldModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const { balances, isLoading } = useTokenBalances();
+  const { railgunWallet, isLoading: railgunLoading, error: railgunError } = useRailgunWallet();
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Get shielded balances
+  const { balance: shieldedUSDC, isLoading: loadingUSDC } = useShieldedBalance('USDC', chainId);
+  const { balance: shieldedPYUSD, isLoading: loadingPYUSD } = useShieldedBalance('PYUSD', chainId);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-black text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-20">
+            <p className="text-muted">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get ETH balance
+  const ethBalance = balances.find((b) => b.symbol === "ETH");
+
+  // Get token balances (USDC, PYUSD)
+  const tokenBalances = balances.filter((b) => b.symbol !== "ETH");
 
   return (
     <div className="p-8 space-y-8">
@@ -38,6 +76,27 @@ export default function EmployerDashboard() {
         </p>
       </div>
 
+      {/* RAILGUN Status */}
+      {!isConnected && (
+        <div className="border border-yellow-500 bg-yellow-500/10 p-6">
+          <p className="text-sm text-yellow-500">
+            Connect your wallet to access RAILGUN private payroll features.
+          </p>
+        </div>
+      )}
+
+      {railgunLoading && isConnected && (
+        <div className="border border-border p-6">
+          <p className="text-sm text-muted">Loading your RAILGUN wallet...</p>
+        </div>
+      )}
+
+      {railgunError && (
+        <div className="border border-red-500 bg-red-500/10 p-6">
+          <p className="text-sm text-red-500">Error: {railgunError}</p>
+        </div>
+      )}
+
       {/* Section 1: Balances */}
       <div className="grid grid-cols-2 gap-6">
         {/* Public Balance */}
@@ -45,40 +104,87 @@ export default function EmployerDashboard() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="text-xs text-muted uppercase tracking-wide mb-1">
-                Ethereum Balance
+                Public Wallet Balance
               </p>
-              <h3 className="text-2xl font-bold">0.5421 ETH</h3>
+              {!isConnected ? (
+                <h3 className="text-2xl font-bold text-muted">Connect Wallet</h3>
+              ) : isLoading ? (
+                <h3 className="text-2xl font-bold text-muted">Loading...</h3>
+              ) : (
+                <div className="space-y-1">
+                  {/* Always show ETH */}
+                  <h3 className="text-2xl font-bold">
+                    {ethBalance ? ethBalance.formatted : "0.0000"} ETH
+                  </h3>
+                  {/* Always show tokens */}
+                  {tokenBalances.length > 0 ? (
+                    tokenBalances.map((token) => (
+                      <p key={token.symbol} className="text-lg font-semibold">
+                        {token.formatted} {token.symbol}
+                      </p>
+                    ))
+                  ) : (
+                    <>
+                      <p className="text-lg font-semibold text-muted">0.00 USDC</p>
+                      <p className="text-lg font-semibold text-muted">0.00 PYUSD</p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <Wallet className="w-5 h-5 text-muted" />
           </div>
-          <p className="text-xs text-muted mb-4">Public wallet balance</p>
-          <button className="text-xs px-3 py-2 border border-border hover:bg-white hover:text-black transition-colors flex items-center space-x-2">
+          <p className="text-xs text-muted mb-4">
+            {isConnected ? "Ethereum & ERC-20 tokens" : "Connect wallet to view balances"}
+          </p>
+          <button
+            onClick={() => setIsShieldModalOpen(true)}
+            disabled={!isConnected || !railgunWallet}
+            className="text-xs px-3 py-2 border border-border hover:bg-white hover:text-black transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Shield className="w-3 h-3" />
             <span>Shield</span>
           </button>
         </div>
 
-        {/* Shielded Balance */}
-        <div className="border border-border rounded-lg p-6 bg-black">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-xs text-muted uppercase tracking-wide mb-1">
-                Shielded Balance
-              </p>
-              <h3 className="text-2xl font-bold">4,500 USDC</h3>
+        {/* Private Balance */}
+        {railgunWallet ? (
+          <div className="border border-border rounded-lg p-6 bg-black">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-xs text-muted uppercase tracking-wide mb-1">
+                  Private Balance
+                </p>
+                {loadingUSDC || loadingPYUSD ? (
+                  <h3 className="text-2xl font-bold text-muted">Loading...</h3>
+                ) : (
+                  <>
+                    <h3 className="text-2xl font-bold">{shieldedUSDC} USDC</h3>
+                    <p className="text-lg font-semibold text-muted">{shieldedPYUSD} PYUSD</p>
+                  </>
+                )}
+              </div>
+              <Shield className="w-5 h-5 text-green-500" />
             </div>
-            <Shield className="w-5 h-5 text-green-500" />
+            <p className="text-xs text-muted mb-2">RAILGUN shielded balance</p>
+            <div className="flex items-center space-x-2 mb-4">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-green-500">Wallet Active</span>
+            </div>
+            <button className="text-xs px-3 py-2 border border-border hover:bg-white hover:text-black transition-colors flex items-center space-x-2">
+              <ArrowRight className="w-3 h-3" />
+              <span>Unshield</span>
+            </button>
           </div>
-          <p className="text-xs text-muted mb-2">Private RAILGUN balance</p>
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-xs text-green-500">POI Validated</span>
+        ) : (
+          <div className="border border-border rounded-lg p-6 bg-black flex flex-col items-center justify-center text-center min-h-[200px]">
+            <Shield className="w-8 h-8 mb-4 text-muted" />
+            <h3 className="text-lg font-bold mb-2">RAILGUN Wallet</h3>
+            <p className="text-sm text-muted mb-6 max-w-sm">
+              {isConnected ? "Your RAILGUN wallet will be created automatically." : "Connect your Ethereum wallet to get started."}
+            </p>
           </div>
-          <button className="text-xs px-3 py-2 border border-border hover:bg-white hover:text-black transition-colors flex items-center space-x-2">
-            <ArrowRight className="w-3 h-3" />
-            <span>Unshield</span>
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Section 2: Employee Table */}
@@ -193,6 +299,15 @@ export default function EmployerDashboard() {
           Process Payroll Batch
         </button>
       </div>
+
+      {/* Shield Modal */}
+      {railgunWallet && (
+        <ShieldModal
+          isOpen={isShieldModalOpen}
+          onClose={() => setIsShieldModalOpen(false)}
+          railgunAddress={railgunWallet.railgunAddress}
+        />
+      )}
     </div>
   );
 }

@@ -2,13 +2,27 @@
 
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { Wallet, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function ConnectWallet() {
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <button className="flex items-center space-x-2 bg-white text-black px-4 py-2 hover:bg-gray-200 transition-colors font-semibold text-sm rounded">
+        <Wallet className="w-4 h-4" />
+        <span>Connect Wallet</span>
+      </button>
+    );
+  }
 
   if (isConnected && address) {
     return (

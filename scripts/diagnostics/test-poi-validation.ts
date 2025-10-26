@@ -15,12 +15,17 @@ import {
   getTXOsReceivedPOIStatusInfoForWallet,
   refreshReceivePOIsForWallet,
   createRailgunWallet,
+  setOnUTXOMerkletreeScanCallback,
+  getEngine,
 } from '@railgun-community/wallet';
 import {
   NetworkName,
   FallbackProviderJsonConfig,
   NETWORK_CONFIG,
   TXIDVersion,
+  MerkletreeScanStatus,
+  MerkletreeScanUpdateEvent,
+  poll,
 } from '@railgun-community/shared-models';
 import leveldown from 'leveldown';
 import fs from 'fs';
@@ -28,6 +33,52 @@ import fs from 'fs';
 const NETWORK_NAME: NetworkName = NetworkName.EthereumSepolia;
 const RPC_URL = process.env.ETHEREUM_RPC_URL!;
 const EMPLOYER_MNEMONIC = process.env.RAILGUN_WALLET_MNEMONIC!;
+
+let currentMerkletreeScanStatus: MerkletreeScanStatus | undefined;
+
+const merkletreeScanCallback = (scanData: MerkletreeScanUpdateEvent): void => {
+  const progress = Math.round(scanData.progress * 100);
+  console.log(
+    `   📊 Merkletree scan: ${progress}% [${scanData.scanStatus}] - Chain: ${scanData.chain?.type}:${scanData.chain?.id}`
+  );
+  currentMerkletreeScanStatus = scanData.scanStatus;
+
+  // If scan completes, log it clearly
+  if (scanData.scanStatus === MerkletreeScanStatus.Complete) {
+    console.log('   ✅ Scan status set to COMPLETE');
+  }
+};
+
+const pollUntilMerkletreeScanned = async (): Promise<void> => {
+  console.log('   ⏳ Waiting for merkletree scan to complete...\n');
+
+  let callbackCalled = false;
+  const originalCallback = currentMerkletreeScanStatus;
+
+  const status = await poll(
+    async () => {
+      if (currentMerkletreeScanStatus !== undefined && !callbackCalled) {
+        callbackCalled = true;
+        console.log('   📞 Scan callback was called!');
+      }
+      return currentMerkletreeScanStatus;
+    },
+    (status) => status === MerkletreeScanStatus.Complete,
+    500, // Poll every 500ms
+    180, // 90 seconds timeout (180 * 500ms)
+  );
+
+  if (!callbackCalled) {
+    console.log('   ❌ WARNING: Scan callback was NEVER called!');
+    console.log('   This means the scan completed before the wallet was created,');
+    console.log('   or the callback wasn\'t properly registered.\n');
+  }
+
+  if (status !== MerkletreeScanStatus.Complete) {
+    throw new Error('Merkletree scan timed out after 90 seconds');
+  }
+  console.log('   ✅ Merkletree scan complete!\n');
+};
 
 const fileExists = (path: string): Promise<boolean> => {
   return new Promise(resolve => {
@@ -95,6 +146,9 @@ async function main() {
     ],
   };
 
+  // Set up merkletree scan callback BEFORE loading provider
+  setOnUTXOMerkletreeScanCallback(merkletreeScanCallback);
+
   const pollingInterval = 10000;
   await loadProvider(fallbackProviderConfig, NETWORK_NAME, pollingInterval);
 
@@ -106,16 +160,39 @@ async function main() {
   // Encryption key must be 32 bytes (64 hex characters) for AES-256
   const encryptionKey = '0101010101010101010101010101010101010101010101010101010101010101';
 
+  // Scan from 2 days ago to find historical UTXOs
+  const creationBlockNumbers = {
+    [NetworkName.EthereumSepolia]: 9475000, // ~2 days ago
+  };
+
   const employerWallet = await createRailgunWallet(
     encryptionKey,
     EMPLOYER_MNEMONIC,
-    {}, // creationBlockNumbers - empty object means start from current block
+    creationBlockNumbers, // Scan from historical block to find all UTXOs
   );
 
-  console.log(`✅ Wallet loaded: ${employerWallet.id.substring(0, 20)}...\n`);
+  console.log(`✅ Wallet loaded:`);
+  console.log(`   Wallet ID: ${employerWallet.id.substring(0, 20)}...`);
+  console.log(`   0zk Address: ${employerWallet.railgunAddress}`);
+  console.log();
 
   // Get wallet object
   const walletObj = walletForID(employerWallet.id);
+
+  // Trigger the blockchain scan
+  console.log('⏳ Triggering blockchain scan...');
+  console.log('   Starting from block 9,475,000 to current block\n');
+
+  const { chain } = NETWORK_CONFIG[NETWORK_NAME];
+  getEngine().scanContractHistory(
+    chain,
+    undefined, // walletIdFilter - scan all wallets
+  );
+
+  // Wait for merkletree scan to complete
+  console.log('⏳ Waiting for scan to complete...\n');
+
+  await pollUntilMerkletreeScanned();
 
   console.log('='.repeat(70));
   console.log('📋 STEP 1: Get Current POI Status for All UTXOs');

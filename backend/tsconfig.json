@@ -11,14 +11,9 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "types": ["node"]
   },
-  "include": ["scripts/**/*", "shared/**/*"],
-  "exclude": ["node_modules", "dist", "frontend"],
-  "ts-node": {
-    "compilerOptions": {
-      "module": "commonjs"
-    }
-  }
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

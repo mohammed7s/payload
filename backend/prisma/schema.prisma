@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String     @id @default(uuid())
+  ethereumAddress   String     @unique
+  railgunWalletId   String?
+  railgunAddress    String?
+  encryptionKey     String?
+  encryptedMnemonic String?    // Encrypted mnemonic for wallet recovery
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  // Employer relationships
+  employees         Employee[] @relation("EmployerEmployees")
+  payrollBatches    PayrollBatch[]
+}
+
+model Employee {
+  id              String    @id @default(uuid())
+  name            String
+  email           String?
+  railgunAddress  String
+  salary          String    // Amount as string (e.g., "1000")
+  tokenSymbol     String    // USDC or PYUSD
+  status          String    @default("active") // active, invited, inactive
+
+  // Relationships
+  employerId      String
+  employer        User      @relation("EmployerEmployees", fields: [employerId], references: [id], onDelete: Cascade)
+
+  payments        Payment[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([employerId])
+}
+
+model PayrollBatch {
+  id              String    @id @default(uuid())
+  employerId      String
+  employer        User      @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  tokenSymbol     String    // USDC or PYUSD
+  totalAmount     String    // Total amount paid
+  employeeCount   Int       // Number of employees paid
+  status          String    // pending, processing, completed, failed
+  txHash          String?   // Transaction hash if applicable
+
+  payments        Payment[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([employerId])
+}
+
+model Payment {
+  id              String       @id @default(uuid())
+
+  batchId         String
+  batch           PayrollBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  employeeId      String
+  employee        Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  amount          String
+  tokenSymbol     String
+  status          String       // pending, completed, failed
+  txHash          String?
+
+  createdAt       DateTime     @default(now())
+
+  @@index([batchId])
+  @@index([employeeId])
+}
