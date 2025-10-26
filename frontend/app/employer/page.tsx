@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Wallet, Shield, ArrowRight, Plus, Mail, Upload, ChevronDown, Send } from "lucide-react";
+import { Wallet, Shield, ArrowRight, Plus, Mail, Upload, ChevronDown, Send, Droplet } from "lucide-react";
 import { useAccount, useChainId } from "wagmi";
 import { useTokenBalances } from "@/hooks/useTokenBalances";
 import { useRailgunWallet } from "@/hooks/useRailgunWallet";
@@ -39,6 +39,7 @@ export default function EmployerDashboard() {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [showAddOptions, setShowAddOptions] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [faucetLoading, setFaucetLoading] = useState<{ usdc: boolean; pyusd: boolean }>({ usdc: false, pyusd: false });
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { balances, isLoading } = useTokenBalances();
@@ -64,6 +65,87 @@ export default function EmployerDashboard() {
   // Get current token balance
   const currentTokenBalance = tokenBalances.find((b) => b.symbol === selectedToken);
   const currentShieldedBalance = selectedToken === "USDC" ? shieldedUSDC : shieldedPYUSD;
+
+  // Faucet functions
+  const requestUSDCFaucet = async () => {
+    if (!address) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    setFaucetLoading({ ...faucetLoading, usdc: true });
+    try {
+      const response = await fetch("/api/faucet/usdc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ address })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // Check if the request was actually rate limited
+        if (data.data.status === "rate_limited") {
+          alert("USDC Faucet is rate limited. Please try again later (usually 24 hours between requests).");
+        } else if (data.data.hash && data.data.explorerLink) {
+          // Success - has transaction hash
+          const message = `USDC Faucet Success!\n\nAmount: ${data.data.amount} USDC\nContract: ${data.data.contractAddress}\nBlockchain: ${data.data.blockchain}\nTx Hash: ${data.data.hash}\n\nOpening Etherscan...`;
+          alert(message);
+          window.open(data.data.explorerLink, '_blank');
+
+          // Refresh page after 3 seconds to show new balance
+          setTimeout(() => window.location.reload(), 3000);
+        } else {
+          // Unknown status
+          alert(`USDC Faucet status: ${data.data.status || 'unknown'}\nPlease check back later.`);
+        }
+      } else {
+        alert(data.error || "USDC Faucet request failed. Please try again later.");
+      }
+    } catch (error) {
+      console.error("USDC Faucet error:", error);
+      alert("Failed to request USDC from faucet");
+    } finally {
+      setFaucetLoading({ ...faucetLoading, usdc: false });
+    }
+  };
+
+  const requestPYUSDFaucet = async () => {
+    if (!address) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    setFaucetLoading({ ...faucetLoading, pyusd: true });
+    try {
+      const response = await fetch("/api/faucet/pyusd", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ address })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const message = `PYUSD Faucet Success!\n\n100 PYUSD sent to ${address}\n\nPage will refresh in 3 seconds to show new balance.`;
+        alert(message);
+
+        // Refresh page after 3 seconds to show new balance
+        setTimeout(() => window.location.reload(), 3000);
+      } else {
+        alert(data.error || "PYUSD Faucet request failed. Please try again later.");
+      }
+    } catch (error) {
+      console.error("PYUSD Faucet error:", error);
+      alert("Failed to request PYUSD from faucet");
+    } finally {
+      setFaucetLoading({ ...faucetLoading, pyusd: false });
+    }
+  };
 
   if (!mounted) {
     return (
@@ -240,6 +322,49 @@ export default function EmployerDashboard() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Testnet Faucets */}
+      <div className="border border-border rounded-lg p-6 bg-black">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold mb-1">Testnet Faucets</h2>
+            <p className="text-xs text-muted">Get free testnet tokens to try the platform</p>
+          </div>
+          <Droplet className="w-5 h-5 text-muted" />
+        </div>
+        <div className="flex space-x-4">
+          <button
+            onClick={requestUSDCFaucet}
+            disabled={!isConnected || faucetLoading.usdc}
+            className="flex-1 text-sm px-4 py-3 border border-border hover:bg-white hover:text-black transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+          >
+            <Image
+              src="/usdc-logo.png"
+              alt="USDC"
+              width={16}
+              height={16}
+              className="rounded-full"
+            />
+            <Droplet className="w-4 h-4" />
+            <span>{faucetLoading.usdc ? "Requesting..." : "Get USDC"}</span>
+          </button>
+          <button
+            onClick={requestPYUSDFaucet}
+            disabled={!isConnected || faucetLoading.pyusd}
+            className="flex-1 text-sm px-4 py-3 border border-border hover:bg-white hover:text-black transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed group"
+          >
+            <Image
+              src="/paypal-icon.svg"
+              alt="PYUSD"
+              width={16}
+              height={16}
+              className="rounded-full"
+            />
+            <Droplet className="w-4 h-4" />
+            <span>{faucetLoading.pyusd ? "Requesting..." : "Get PYUSD"}</span>
+          </button>
+        </div>
       </div>
 
       {/* Section 2: Employee Table */}

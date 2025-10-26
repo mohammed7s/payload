@@ -279,10 +279,23 @@ export function PayrollExecutionModal({
           args: [shieldTxData.transaction.to as `0x${string}`, amountToShield],
         });
 
+        // Show loading toast for approve transaction
+        const approveToastId = addToast(
+          "Approval transaction submitted",
+          "loading",
+          approveTxHash
+        );
+
         // Wait for approve transaction
         if (publicClient) {
           await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
         }
+
+        // Update toast to success
+        updateToast(approveToastId, {
+          message: "Token spend approved successfully!",
+          type: "success"
+        });
 
         updateStep("approve", {
           status: "completed",
