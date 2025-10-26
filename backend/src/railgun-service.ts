@@ -456,8 +456,8 @@ class RailgunBackendService {
   async refreshPOIForUser(userId: string): Promise<void> {
     console.log(`🔄 Refreshing POI proofs for user ${userId}...`);
 
-    const user = await this.prisma.railgunWallet.findUnique({
-      where: { id: userId }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
     });
 
     if (!user || !user.railgunWalletId) {
