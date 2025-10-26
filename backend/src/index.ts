@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { railgunService } from './railgun-service';
+import { prisma } from './db';
 
 dotenv.config();
 
@@ -346,6 +347,172 @@ app.post('/api/railgun/scan', async (req, res) => {
     console.error('Error triggering scan:', error);
     res.status(500).json({
       error: error.message || 'Failed to trigger blockchain scan',
+    });
+  }
+});
+
+// ============================================================================
+// Employee Management API
+// ============================================================================
+
+/**
+ * Add a new employee
+ *
+ * POST /api/employees
+ * Body: {
+ *   employerAddress: string,
+ *   name: string,
+ *   railgunAddress: string,
+ *   salary: string,
+ *   tokenSymbol: 'USDC' | 'PYUSD',
+ *   email?: string
+ * }
+ */
+app.post('/api/employees', async (req, res) => {
+  try {
+    const { employerAddress, name, railgunAddress, salary, tokenSymbol, email } = req.body;
+
+    if (!employerAddress || !name || !railgunAddress || !salary || !tokenSymbol) {
+      return res.status(400).json({
+        error: 'Missing required fields: employerAddress, name, railgunAddress, salary, tokenSymbol',
+      });
+    }
+
+    // Get employer user
+    const employer = await prisma.user.findUnique({
+      where: { ethereumAddress: employerAddress },
+    });
+
+    if (!employer) {
+      return res.status(404).json({
+        error: 'Employer not found',
+      });
+    }
+
+    // Create employee
+    const employee = await prisma.employee.create({
+      data: {
+        name,
+        email,
+        railgunAddress,
+        salary,
+        tokenSymbol,
+        employerId: employer.id,
+        status: 'active',
+      },
+    });
+
+    res.json({
+      success: true,
+      employee,
+    });
+  } catch (error: any) {
+    console.error('Error adding employee:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to add employee',
+    });
+  }
+});
+
+/**
+ * Get all employees for an employer
+ *
+ * GET /api/employees/:employerAddress
+ */
+app.get('/api/employees/:employerAddress', async (req, res) => {
+  try {
+    const { employerAddress } = req.params;
+
+    // Get employer user
+    const employer = await prisma.user.findUnique({
+      where: { ethereumAddress: employerAddress },
+      include: {
+        employees: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!employer) {
+      return res.status(404).json({
+        error: 'Employer not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      employees: employer.employees,
+    });
+  } catch (error: any) {
+    console.error('Error getting employees:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to get employees',
+    });
+  }
+});
+
+/**
+ * Update an employee
+ *
+ * PUT /api/employees/:employeeId
+ * Body: {
+ *   name?: string,
+ *   salary?: string,
+ *   tokenSymbol?: 'USDC' | 'PYUSD',
+ *   status?: string
+ * }
+ */
+app.put('/api/employees/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { name, email, salary, tokenSymbol, status } = req.body;
+
+    const updateData: any = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email || null; // Convert empty string to null
+    if (salary !== undefined) updateData.salary = salary;
+    if (tokenSymbol !== undefined) updateData.tokenSymbol = tokenSymbol;
+    if (status !== undefined) updateData.status = status;
+
+    const employee = await prisma.employee.update({
+      where: { id: employeeId },
+      data: updateData,
+    });
+
+    res.json({
+      success: true,
+      employee,
+    });
+  } catch (error: any) {
+    console.error('Error updating employee:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to update employee',
+    });
+  }
+});
+
+/**
+ * Delete an employee
+ *
+ * DELETE /api/employees/:employeeId
+ */
+app.delete('/api/employees/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+
+    await prisma.employee.delete({
+      where: { id: employeeId },
+    });
+
+    res.json({
+      success: true,
+      message: 'Employee deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('Error deleting employee:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to delete employee',
     });
   }
 });
