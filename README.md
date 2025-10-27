@@ -2,6 +2,8 @@
 
 A privacy-first payroll system using RAILGUN on Ethereum Sepolia testnet.
 
+ **🚀 [Live Demo](https://payload-privacy.netlify.app/)**
+
 ## Project Structure
 
 ```
@@ -28,7 +30,7 @@ Privacy-first payroll system that allows employers to pay employees using zero-k
 
 1. Install dependencies:
 ```bash
-bun install
+yarn install
 ```
 
 2. Create `.env` file (see `.env.example`)
@@ -66,48 +68,18 @@ yarn ts-node scripts/transfer.ts
 3. **Private Transfer**: Zero-knowledge proofs allow you to transfer without revealing amounts or identities on-chain
 4. **Employee Receives**: Employee's RAILGUN wallet detects and decrypts the incoming private note
 
-## Current Status
 
-### ✅ Completed
-- Frontend UI with Employer & Individual portals
-- Wallet connection (wagmi + MetaMask)
-- Landing page, navigation, routing
-- Test scripts for RAILGUN operations (shield, transfer)
-- Shared type definitions
-- Placeholder pages for all routes
+## Resources
 
-### 🚧 In Progress
-- RAILGUN client-side integration
-- Shield/Unshield functionality
-- Employee management CRUD
-
-### 📋 Next Steps
-- Connect RAILGUN SDK to frontend
-- Implement shield/unshield buttons
-- Build employee management page with add/edit/delete
-- Real-time balance updates from RAILGUN
-- Private transfer flow for payroll processing
-
-## Key Concepts
-
-- **0zk address**: RAILGUN's private address format (starts with `0zk1`)
-- **POI (Private Proof of Innocence)**: Privacy-preserving compliance mechanism
-- **UTXO**: Unspent Transaction Output - similar to Bitcoin's model
-- **boundParamsHash**: Hash that binds the ZK proof to specific transaction parameters
-
-## Troubleshooting
-
-### "No spendable balance"
-Wait 1 hour after shielding for POI validation to complete.
-
-### "Invalid Snark Proof"
-Ensure `overallBatchMinGasPrice` matches between proof generation and transaction submission.
-
-### Background sync errors
-These are warnings about historical blockchain data and can be ignored. The script will exit cleanly with `process.exit(0)`.
+- **RAILGUN Documentation**: [https://docs.railgun.org/](https://docs.railgun.org/)
+- **RAILGUN SDK Guide**: [https://docs.railgun.org/developer-guide/cookbook/](https://docs.railgun.org/developer-guide/cookbook/)
+- **Proof of Innocence**: [https://docs.railgun.org/wiki/learn/privacy-system/proof-of-innocence](https://docs.railgun.org/wiki/learn/privacy-system/proof-of-innocence)
 
 ## Notes
-
 - This is a testnet-only implementation
-- Never commit your `.env` file or private keys
-- The employee wallet in this test uses a standard test mnemonic - in production, employees provide their own 0zk addresses
+- Wallets are managed by backend in this model which is not secure at all
+
+
+### 📋 Next Steps
+- Implement client side wallet management
+- Add auth/security to app 

@@ -23,7 +23,7 @@ export default function HowToUsePage() {
             <div className="border-l-2 border-white/20 pl-4">
               <h3 className="text-base font-semibold mb-2">2. Get Testnet Tokens</h3>
               <p className="text-sm text-white/70 mb-2">
-                Use the faucet buttons to get free testnet tokens (rate-limited to once per 24 hours).
+                Use the faucet buttons: "Get USDC" opens Circle's faucet, "Get PYUSD" requests 100 PYUSD directly.
               </p>
             </div>
 

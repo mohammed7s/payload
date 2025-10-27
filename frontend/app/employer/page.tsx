@@ -67,49 +67,14 @@ export default function EmployerDashboard() {
   const currentShieldedBalance = selectedToken === "USDC" ? shieldedUSDC : shieldedPYUSD;
 
   // Faucet functions
-  const requestUSDCFaucet = async () => {
+  const requestUSDCFaucet = () => {
     if (!address) {
       alert("Please connect your wallet first");
       return;
     }
 
-    setFaucetLoading({ ...faucetLoading, usdc: true });
-    try {
-      const response = await fetch("/api/faucet/usdc", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ address })
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        // Check if the request was actually rate limited
-        if (data.data.status === "rate_limited") {
-          alert("USDC Faucet is rate limited. Please try again later (usually 24 hours between requests).");
-        } else if (data.data.hash && data.data.explorerLink) {
-          // Success - has transaction hash
-          const message = `USDC Faucet Success!\n\nAmount: ${data.data.amount} USDC\nContract: ${data.data.contractAddress}\nBlockchain: ${data.data.blockchain}\nTx Hash: ${data.data.hash}\n\nOpening Etherscan...`;
-          alert(message);
-          window.open(data.data.explorerLink, '_blank');
-
-          // Refresh page after 3 seconds to show new balance
-          setTimeout(() => window.location.reload(), 3000);
-        } else {
-          // Unknown status
-          alert(`USDC Faucet status: ${data.data.status || 'unknown'}\nPlease check back later.`);
-        }
-      } else {
-        alert(data.error || "USDC Faucet request failed. Please try again later.");
-      }
-    } catch (error) {
-      console.error("USDC Faucet error:", error);
-      alert("Failed to request USDC from faucet");
-    } finally {
-      setFaucetLoading({ ...faucetLoading, usdc: false });
-    }
+    // Redirect directly to Circle's faucet
+    window.open("https://faucet.circle.com/", "_blank");
   };
 
   const requestPYUSDFaucet = async () => {
@@ -336,7 +301,7 @@ export default function EmployerDashboard() {
         <div className="flex space-x-4">
           <button
             onClick={requestUSDCFaucet}
-            disabled={!isConnected || faucetLoading.usdc}
+            disabled={!isConnected}
             className="flex-1 text-sm px-4 py-3 border border-border hover:bg-white hover:text-black transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed group"
           >
             <Image
@@ -347,7 +312,7 @@ export default function EmployerDashboard() {
               className="rounded-full"
             />
             <Droplet className="w-4 h-4" />
-            <span>{faucetLoading.usdc ? "Requesting..." : "Get USDC"}</span>
+            <span>Get USDC →</span>
           </button>
           <button
             onClick={requestPYUSDFaucet}
