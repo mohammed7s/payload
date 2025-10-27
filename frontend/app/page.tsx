@@ -22,12 +22,12 @@ export default function LandingPage() {
           </div>
 
           <nav className="flex items-center space-x-6 text-sm">
-            <Link href="#" className="hover:text-muted transition-colors">
+            <Link href="/docs" className="hover:text-muted transition-colors">
               <FileText className="w-4 h-4 inline mr-1" />
               Docs
             </Link>
             <Link
-              href="https://github.com"
+              href="https://github.com/mohammed7s/payload"
               target="_blank"
               className="hover:text-muted transition-colors"
             >
